@@ -1,5 +1,5 @@
 poorman-handshake @ git+https://github.com/JarbasHiveMind/poorman_handshake.git@a9bd5a9ac3ec48619c2c20adef71fc44bdda2a73
-hivemind-bus-client @ git+https://github.com/thalovant/hivemind-websocket-client.git@5b067ab1f71a327ac0371d0901a947ff518f4e37
+hivemind-bus-client @ git+https://github.com/thalovant/hivemind-websocket-client.git@4fc4a35579247df795749755ab4b1a862b74c57c
 hivemind-plugin-manager @ git+https://github.com/thalovant/hivemind-plugin-manager.git@3583d676c70855a475d6a3d2c5d2ad21085c1806
 hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@834c988839cd12510b2e8acdc51e515090cfdefb
 hivemind-core @ git+https://github.com/thalovant/HiveMind-core.git@f9f56680b1d71c77c994ce488147a1ccff6bf7cc

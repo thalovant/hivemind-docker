@@ -91,6 +91,7 @@ import inspect; \
 import hivemind_ovos_agent_plugin as agent_plugin; \
 import thalovant_hivemind_listener_compat as listener_compat; \
 from hivemind_bus_client.client import HiveMessageBusClient; \
+from hivemind_bus_client.protocol import HiveMindSlaveProtocol; \
 from hivemind_core.service import get_agent_protocol; \
 from hivemind_websocket_protocol import HiveMindWebsocketProtocol; \
 from packaging.version import Version; \
@@ -99,6 +100,8 @@ version = lambda package: metadata.version(package); \
 settings = HiveMindWebsocketProtocol(config={})._websocket_ping_settings(); \
 assert settings.get('websocket_ping_interval', 0) > 0, 'hivemind-websocket-protocol keepalive is not enabled'; \
 assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-bus-client keepalive support is missing'; \
+handshake_source = inspect.getsource(HiveMindSlaveProtocol.handle_handshake); \
+assert 'self.pswd_handshake or self.handshake' in handshake_source, 'pubkey fallback must log the active handshake'; \
 assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
 assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
 assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
