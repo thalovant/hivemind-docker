@@ -64,7 +64,7 @@ RUN apt-get update \
       --reinstall-package hivemind-audio-binary-protocol \
       --reinstall-package hivemind-redis-database \
       -r /tmp/requirements.txt \
- && uv pip install --prerelease="${PRERELEASE}" --no-deps \
+ && uv pip install --prerelease="${PRERELEASE}" \
       --reinstall-package ovos-bus-client \
       --reinstall-package hivemind-ovos-agent-plugin \
       -r /tmp/agent-requirements.txt \
@@ -102,13 +102,13 @@ assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-
 assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
 assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
 assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
-assert Version('2.0.0a3') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must remain on the production 2.x line'; \
+assert Version('2.6.5a1') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must expose authoritative connection state'; \
 assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
 assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
 listener_compat.install(); \
 from hivemind_core.database import ClientDatabase; \
 from hivemind_plugin_manager.database import AbstractDB, Client; \
-assert Version(version('hivemind-plugin-manager')) >= Version('0.7.1a3'), 'hivemind-plugin-manager must include listener policy compatibility shims'; \
+assert Version(version('hivemind-plugin-manager')) >= Version('0.8.0a1'), 'hivemind-plugin-manager must expose the released get_bus contract'; \
 assert hasattr(AbstractDB, 'refresh'), 'hivemind-plugin-manager database refresh support is missing'; \
 assert hasattr(ClientDatabase, 'refresh'), 'listener compat must expose ClientDatabase.refresh before policy admission'; \
 assert Client(client_id=1, api_key='k').message_blacklist == [], 'Client.message_blacklist compatibility shim is missing'; \
