@@ -1,2 +1,2 @@
 ovos-bus-client==2.7.1a1
-hivemind-ovos-agent-plugin @ git+https://github.com/thalovant/hivemind-ovos-agent-plugin.git@596adb590eaee31d1a7e07ba0bb3127ff39f3f64
+hivemind-ovos-agent-plugin @ git+https://github.com/thalovant/hivemind-ovos-agent-plugin.git@22250604a039192d04fad5908b533be2b63a5c42
