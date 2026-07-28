@@ -1,2 +1,2 @@
-ovos-bus-client @ git+https://github.com/goldyfruit/ovos-bus-client.git@ee227152c96cb06553f22471641d787d82a9713c
+ovos-bus-client==2.3.0a2
 hivemind-ovos-agent-plugin @ git+https://github.com/thalovant/hivemind-ovos-agent-plugin.git@d29c08c784b038496ab95f31a63161250567e058
