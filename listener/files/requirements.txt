@@ -1,10 +1,11 @@
-hivemind-bus-client @ git+https://github.com/JarbasHiveMind/hivemind-websocket-client.git@a7f07db862988cc2364367747a2ee57ba6d91927
-hivemind-plugin-manager @ git+https://github.com/thalovant/hivemind-plugin-manager.git@2f9e61f4ea7147df630486000f1800f2584583b2
-hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@77b0681401f307501ca8d6da2477af0ebb3eb79c
-hivemind-core==4.6.7a1
+poorman-handshake @ git+https://github.com/JarbasHiveMind/poorman_handshake.git@a9bd5a9ac3ec48619c2c20adef71fc44bdda2a73
+hivemind-bus-client @ git+https://github.com/thalovant/hivemind-websocket-client.git@4fc4a35579247df795749755ab4b1a862b74c57c
+hivemind-plugin-manager @ git+https://github.com/thalovant/hivemind-plugin-manager.git@3583d676c70855a475d6a3d2c5d2ad21085c1806
+hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@834c988839cd12510b2e8acdc51e515090cfdefb
+hivemind-core @ git+https://github.com/thalovant/HiveMind-core.git@f9f56680b1d71c77c994ce488147a1ccff6bf7cc
 hivemind-http-protocol==0.0.2a3
-hivemind-mqtt-protocol @ file:///tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
+hivemind-mqtt-protocol @ git+https://github.com/thalovant/hivemind-mqtt-protocol.git@2fb77194ac912d51d0ad3babcad53b83e4150b88
 hivemind-audio-binary-protocol==2.1.6a1
-hivemind-redis-database==0.1.0a2
+hivemind-redis-database @ git+https://github.com/thalovant/hivemind-redis-database.git@f378544ac3ef403e21a64f17d5b541e3eeca50c0
 hivemind-intent-quota-plugin[redis] @ file:///tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
 setuptools

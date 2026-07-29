@@ -39,7 +39,6 @@ COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
 COPY files/install_listener_compat.py /tmp/install_listener_compat.py
 COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
 COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
-COPY files/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl /tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
 
 USER root
 
@@ -64,7 +63,7 @@ RUN apt-get update \
       --reinstall-package hivemind-audio-binary-protocol \
       --reinstall-package hivemind-redis-database \
       -r /tmp/requirements.txt \
- && uv pip install --prerelease="${PRERELEASE}" --no-deps \
+ && uv pip install --prerelease="${PRERELEASE}" \
       --reinstall-package ovos-bus-client \
       --reinstall-package hivemind-ovos-agent-plugin \
       -r /tmp/agent-requirements.txt \
@@ -91,7 +90,9 @@ import inspect; \
 import hivemind_ovos_agent_plugin as agent_plugin; \
 import thalovant_hivemind_listener_compat as listener_compat; \
 from hivemind_bus_client.client import HiveMessageBusClient; \
+from hivemind_bus_client.protocol import HiveMindSlaveProtocol; \
 from hivemind_core.service import get_agent_protocol; \
+from hivemind_mqtt_protocol import HiveMindMqttProtocol; \
 from hivemind_websocket_protocol import HiveMindWebsocketProtocol; \
 from packaging.version import Version; \
 subprocess.run([sys.executable, '-m', 'pip', 'check'], check=True); \
@@ -99,16 +100,23 @@ version = lambda package: metadata.version(package); \
 settings = HiveMindWebsocketProtocol(config={})._websocket_ping_settings(); \
 assert settings.get('websocket_ping_interval', 0) > 0, 'hivemind-websocket-protocol keepalive is not enabled'; \
 assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-bus-client keepalive support is missing'; \
+handshake_source = inspect.getsource(HiveMindSlaveProtocol.handle_handshake); \
+assert 'self.pswd_handshake or self.handshake' in handshake_source, 'pubkey fallback must log the active handshake'; \
 assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
 assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
-assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
-assert Version('2.0.0a3') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must remain on the production 2.x line'; \
+assert Version(version('hivemind-mqtt-protocol')) >= Version('0.2.2a3'), 'hivemind-mqtt-protocol must include managed topic and readiness controls'; \
+mqtt_connect_source = inspect.getsource(HiveMindMqttProtocol._on_connect); \
+mqtt_disconnect_source = inspect.getsource(HiveMindMqttProtocol._on_disconnect); \
+assert '_set_broker_ready(True)' in mqtt_connect_source, 'MQTT CONNACK must set broker readiness'; \
+assert '_set_broker_ready(False)' in mqtt_disconnect_source, 'MQTT disconnect must clear broker readiness'; \
+assert HiveMindMqttProtocol(config={'hub_id': 'hub-a'})._topic_base() == 'hivemind/hub-a', 'MQTT topics must remain hub-scoped'; \
+assert Version('2.6.5a1') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must expose authoritative connection state'; \
 assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
 assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
 listener_compat.install(); \
 from hivemind_core.database import ClientDatabase; \
 from hivemind_plugin_manager.database import AbstractDB, Client; \
-assert Version(version('hivemind-plugin-manager')) >= Version('0.7.1a3'), 'hivemind-plugin-manager must include listener policy compatibility shims'; \
+assert Version(version('hivemind-plugin-manager')) >= Version('0.8.0a1'), 'hivemind-plugin-manager must expose the released get_bus contract'; \
 assert hasattr(AbstractDB, 'refresh'), 'hivemind-plugin-manager database refresh support is missing'; \
 assert hasattr(ClientDatabase, 'refresh'), 'listener compat must expose ClientDatabase.refresh before policy admission'; \
 assert Client(client_id=1, api_key='k').message_blacklist == [], 'Client.message_blacklist compatibility shim is missing'; \
