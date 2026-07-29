@@ -39,7 +39,6 @@ COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
 COPY files/install_listener_compat.py /tmp/install_listener_compat.py
 COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
 COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
-COPY files/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl /tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
 
 USER root
 
@@ -93,6 +92,7 @@ import thalovant_hivemind_listener_compat as listener_compat; \
 from hivemind_bus_client.client import HiveMessageBusClient; \
 from hivemind_bus_client.protocol import HiveMindSlaveProtocol; \
 from hivemind_core.service import get_agent_protocol; \
+from hivemind_mqtt_protocol import HiveMindMqttProtocol; \
 from hivemind_websocket_protocol import HiveMindWebsocketProtocol; \
 from packaging.version import Version; \
 subprocess.run([sys.executable, '-m', 'pip', 'check'], check=True); \
@@ -104,7 +104,12 @@ handshake_source = inspect.getsource(HiveMindSlaveProtocol.handle_handshake); \
 assert 'self.pswd_handshake or self.handshake' in handshake_source, 'pubkey fallback must log the active handshake'; \
 assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
 assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
-assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
+assert Version(version('hivemind-mqtt-protocol')) >= Version('0.2.2a3'), 'hivemind-mqtt-protocol must include managed topic and readiness controls'; \
+mqtt_connect_source = inspect.getsource(HiveMindMqttProtocol._on_connect); \
+mqtt_disconnect_source = inspect.getsource(HiveMindMqttProtocol._on_disconnect); \
+assert '_set_broker_ready(True)' in mqtt_connect_source, 'MQTT CONNACK must set broker readiness'; \
+assert '_set_broker_ready(False)' in mqtt_disconnect_source, 'MQTT disconnect must clear broker readiness'; \
+assert HiveMindMqttProtocol(config={'hub_id': 'hub-a'})._topic_base() == 'hivemind/hub-a', 'MQTT topics must remain hub-scoped'; \
 assert Version('2.6.5a1') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must expose authoritative connection state'; \
 assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
 assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
