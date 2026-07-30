@@ -125,6 +125,7 @@ internal_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_intern
 assert 'list(self.clients.items())' in send_source, 'agent send fan-out must snapshot clients'; \
 assert '.get(peer)' in send_source, 'agent direct send must tolerate disconnect races'; \
 assert 'list(self.clients.items())' in internal_source, 'agent internal mycroft routing must snapshot clients'; \
+assert 'SESSION1_REGISTERED_FIELDS' in internal_source, 'agent downstream session null omission is missing'; \
 agent_class, _ = get_agent_protocol(); \
 assert agent_class.__name__ == 'OVOSAgentProtocol', f'unexpected agent protocol resolved: {agent_class.__name__}'"
 
