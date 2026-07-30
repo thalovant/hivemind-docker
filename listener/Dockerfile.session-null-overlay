@@ -1,0 +1,24 @@
+FROM ghcr.io/thalovant/hivemind-listener:pr-141-142-29-get-bus-20260728-r5@sha256:4c22b8225219af4d9cc6dd465ff86665e458752e5d4bb8c8e42fe62ee3d4f58f
+
+ARG USER=hivemind
+ARG VERSION=unknown
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
+USER root
+
+RUN uv pip install --no-cache-dir --prerelease=allow \
+      --reinstall-package hivemind-ovos-agent-plugin \
+      "hivemind-ovos-agent-plugin @ git+https://github.com/thalovant/hivemind-ovos-agent-plugin.git@bd02d591e401e1b6f7dc53344b58012002feba7b" \
+ && "/home/${USER}/.venv/bin/python" -m pip check \
+ && "/home/${USER}/.venv/bin/python" -c "\
+import inspect; \
+from hivemind_ovos_agent_plugin import OVOSAgentProtocol; \
+source = inspect.getsource(OVOSAgentProtocol.handle_internal_mycroft); \
+assert 'SESSION1_REGISTERED_FIELDS' in source; \
+assert 'value is not None or key not in SESSION1_REGISTERED_FIELDS' in source; \
+print('downstream session-null omission checks passed')"
+
+USER "$USER"
