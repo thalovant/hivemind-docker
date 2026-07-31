@@ -35,7 +35,6 @@ ENV HIVEMIND_WEBSOCKET_PING_INTERVAL=25 \
 COPY files/requirements.txt /tmp/requirements.txt
 COPY files/agent-requirements.txt /tmp/agent-requirements.txt
 COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
 COPY files/install_listener_compat.py /tmp/install_listener_compat.py
 COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
 COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
@@ -67,7 +66,6 @@ RUN apt-get update \
       --reinstall-package ovos-bus-client \
       --reinstall-package hivemind-ovos-agent-plugin \
       -r /tmp/agent-requirements.txt \
- && "/home/${USER}/.venv/bin/python" /tmp/patch_hivemind_ovos_agent.py \
  && "/home/${USER}/.venv/bin/python" /tmp/install_listener_compat.py \
  && if [ -n "${GITHUB_TOKEN:-}" ]; then \
       git config --global --remove-section url."https://x-access-token:${GITHUB_TOKEN}@github.com/" || true; \
@@ -102,7 +100,7 @@ assert settings.get('websocket_ping_interval', 0) > 0, 'hivemind-websocket-proto
 assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-bus-client keepalive support is missing'; \
 handshake_source = inspect.getsource(HiveMindSlaveProtocol.handle_handshake); \
 assert 'self.pswd_handshake or self.handshake' in handshake_source, 'pubkey fallback must log the active handshake'; \
-assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
+assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.3a17'), 'hivemind-websocket-protocol must be at least 0.2.3a17'; \
 assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
 assert Version(version('hivemind-mqtt-protocol')) >= Version('0.2.2a3'), 'hivemind-mqtt-protocol must include managed topic and readiness controls'; \
 mqtt_connect_source = inspect.getsource(HiveMindMqttProtocol._on_connect); \
@@ -111,8 +109,8 @@ assert '_set_broker_ready(True)' in mqtt_connect_source, 'MQTT CONNACK must set 
 assert '_set_broker_ready(False)' in mqtt_disconnect_source, 'MQTT disconnect must clear broker readiness'; \
 assert HiveMindMqttProtocol(config={'hub_id': 'hub-a'})._topic_base() == 'hivemind/hub-a', 'MQTT topics must remain hub-scoped'; \
 assert Version('2.6.5a1') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must expose authoritative connection state'; \
-assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
-assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
+assert Version(version('hivemind-core')) >= Version('4.10.2a8'), 'hivemind-core must include the latest fork query and admission fixes'; \
+assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a15'), 'hivemind-ovos-agent-plugin must include modern speak routing and session sanitation'; \
 listener_compat.install(); \
 from hivemind_core.database import ClientDatabase; \
 from hivemind_plugin_manager.database import AbstractDB, Client; \
