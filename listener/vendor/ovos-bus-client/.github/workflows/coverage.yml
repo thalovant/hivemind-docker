@@ -1,0 +1,21 @@
+name: Code Coverage
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/coverage.yml@dev
+    with:
+      python_version: '3.11'
+      coverage_source: 'ovos_bus_client'
+      test_path: 'test/unittests'
+      install_extras: '-e .[test]'
+      # Floor matches what pytest --cov reports in CI. Real coverage measured
+      # via `coverage run -m pytest && coverage report` is ~93%; pytest-cov
+      # under-reports module-import lines because the cov plugin starts after
+      # production modules are already imported. Floor is set conservatively
+      # to track CI's reported number, not the real one.
+      min_coverage: 65

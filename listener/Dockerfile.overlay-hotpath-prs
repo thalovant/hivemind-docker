@@ -1,0 +1,28 @@
+FROM ghcr.io/thalovant/hivemind-listener:bench-scale-recovery-ee22715-4edeaad@sha256:64f79606d09bbc822d9e494f853a1960bf9081f5f4d0f3ad87e8c348e65e8efc
+
+ARG USER=hivemind
+ARG VERSION=unknown
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
+USER root
+
+RUN "/home/${USER}/.venv/bin/python" -m pip install --no-cache-dir --no-deps --force-reinstall \
+      "hivemind-core @ git+https://github.com/JarbasHiveMind/HiveMind-core.git@4dfa9a958266e78e830abff44385a39ea85a2da0" \
+      "hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@8b106116d9a9c9e4c49270a6354d418293f1c551" \
+ && "/home/${USER}/.venv/bin/python" -m pip check \
+ && "/home/${USER}/.venv/bin/python" -c "\
+import importlib.metadata as metadata; \
+import inspect; \
+from hivemind_core.service import get_agent_protocol; \
+import hivemind_websocket_protocol; \
+agent_class, _ = get_agent_protocol(); \
+assert agent_class.__name__ == 'OVOSAgentProtocol', f'unexpected agent protocol resolved: {agent_class.__name__}'; \
+websocket_source = inspect.getsource(hivemind_websocket_protocol); \
+assert 'LOG.debug(f\"Received' in websocket_source, 'websocket received-message logging is not debug'; \
+assert 'LOG.info(f\"Received' not in websocket_source, 'websocket received-message logging is still info'; \
+print('hotpath PR overlay checks passed', metadata.version('hivemind-core'), metadata.version('hivemind-websocket-protocol'))"
+
+USER "$USER"

@@ -23,6 +23,8 @@ def main() -> None:
 
     path = Path(spec.origin)
     source = path.read_text()
+    if "_send_to_client" in source and "list(self.clients.items())" in source:
+        return
 
     replacements = {
         "for peer in self.clients:\n"

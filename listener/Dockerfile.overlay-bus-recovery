@@ -1,0 +1,36 @@
+FROM ghcr.io/thalovant/hivemind-listener:bench-scale-backports-14e1068-70ad3a-dd2aad4@sha256:14e581a47b994447b1cf86fe38925bb776fbd5e7bc37b0ec08410fce076e0d8e
+
+ARG USER=hivemind
+ARG VERSION=unknown
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
+USER root
+
+COPY vendor/ovos-bus-client /tmp/vendor/ovos-bus-client
+COPY vendor/hivemind-ovos-agent-plugin /tmp/vendor/hivemind-ovos-agent-plugin
+
+RUN "/home/${USER}/.venv/bin/python" -m pip install --no-cache-dir --no-deps --force-reinstall \
+      /tmp/vendor/ovos-bus-client \
+      /tmp/vendor/hivemind-ovos-agent-plugin \
+ && "/home/${USER}/.venv/bin/python" -m pip check \
+ && "/home/${USER}/.venv/bin/python" -c "\
+import importlib.metadata as metadata; \
+import inspect; \
+from packaging.version import Version; \
+from ovos_bus_client.client.client import MessageBusClient; \
+from hivemind_ovos_agent_plugin import OVOSAgentProtocol; \
+assert metadata.version('ovos-bus-client') == '2.3.0a2'; \
+assert Version(metadata.version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'); \
+assert 'connected_event.clear' in inspect.getsource(MessageBusClient.on_close); \
+assert 'connected_event.clear' in inspect.getsource(MessageBusClient.on_error); \
+assert hasattr(OVOSAgentProtocol, '_replace_bus'); \
+assert hasattr(OVOSAgentProtocol, '_mark_bus_disconnected'); \
+assert 'for attempt in range(2)' in inspect.getsource(OVOSAgentProtocol.emit_client_message); \
+assert 'for attempt in range(2)' in inspect.getsource(OVOSAgentProtocol.natural_language_query); \
+print('listener bus recovery checks passed')" \
+ && rm -rf /tmp/vendor
+
+USER "$USER"

@@ -1,2 +1,9 @@
-ovos-bus-client==2.3.0a2
-hivemind-ovos-agent-plugin==0.3.2a1
+# Both upstream commits these used to pin have been deleted from GitHub
+# (goldyfruit/ovos-bus-client@ee227152 and
+# JarbasHiveMind/hivemind-ovos-agent-plugin@4edeaad both return 422), so the
+# image could no longer be rebuilt from source at all: any requirements edit
+# busts the layer cache and the fresh resolve fails on 'not our ref'. The
+# sources are already vendored in this repo for exactly this reason; build
+# from them so the image is reproducible.
+ovos-bus-client @ file:///tmp/vendor/ovos-bus-client
+hivemind-ovos-agent-plugin @ file:///tmp/vendor/hivemind-ovos-agent-plugin

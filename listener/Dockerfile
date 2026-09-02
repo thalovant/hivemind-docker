@@ -34,6 +34,7 @@ ENV HIVEMIND_WEBSOCKET_PING_INTERVAL=25 \
 
 COPY files/requirements.txt /tmp/requirements.txt
 COPY files/agent-requirements.txt /tmp/agent-requirements.txt
+COPY vendor/ /tmp/vendor/
 COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
 COPY files/install_listener_compat.py /tmp/install_listener_compat.py
