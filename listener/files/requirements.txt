@@ -6,7 +6,7 @@ hivemind-core @ git+https://github.com/JarbasHiveMind/HiveMind-core.git@70ad3a66
 hivemind-http-protocol==0.0.11a1
 hivemind-mqtt-protocol @ file:///tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
 hivemind-audio-binary-protocol==2.1.6a1
-hivemind-redis-database @ git+https://github.com/thalovant/hivemind-redis-database.git@f378544ac3ef403e21a64f17d5b541e3eeca50c0
+hivemind-redis-database @ git+https://github.com/thalovant/hivemind-redis-database.git@f1e7428113b27d77402dd5f63015044a7506fff9
 hivemind-intent-quota-plugin[redis] @ file:///tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
 setuptools
 # The listener compat step imports packaging; it used to arrive transitively
