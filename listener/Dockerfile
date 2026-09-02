@@ -1,30 +1,128 @@
+# syntax=docker/dockerfile:1.7
 ARG TAG=alpha
-FROM smartgic/hivemind-base:${TAG}
+ARG REGISTRY=docker.io/smartgic
+ARG BASE_IMAGE=${REGISTRY}/hivemind-base:${TAG}
+FROM ${BASE_IMAGE}
+ARG TAG
+ARG REGISTRY
+ARG BASE_IMAGE
+ARG GIT_SHA=unknown
 
 ARG BUILD_DATE=unknown
 ARG VERSION=unknown
 
-LABEL org.opencontainers.image.title="HiveMind OCI HiveMind listener"
-LABEL org.opencontainers.image.description="Start listening for HiveMind connections"
-LABEL org.opencontainers.image.version=${VERSION}
-LABEL org.opencontainers.image.created=${BUILD_DATE}
-LABEL org.opencontainers.image.documentation="https://jarbashivemind.github.io/HiveMind-community-docs/"
-LABEL org.opencontainers.image.source="https://github.com/JarbasHiveMind/hivemind-docker"
-LABEL org.opencontainers.image.vendor="HiveMind"
+LABEL org.opencontainers.image.title="HiveMind OCI HiveMind listener" \
+      org.opencontainers.image.description="Start listening for HiveMind connections" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.documentation="https://jarbashivemind.github.io/HiveMind-community-docs/" \
+      org.opencontainers.image.source="https://github.com/JarbasHiveMind/hivemind-docker" \
+      org.opencontainers.image.vendor="HiveMind" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.authors="HiveMind Community" \
+      org.opencontainers.image.base.name="${REGISTRY}/hivemind-base:${TAG}" \
+      org.opencontainers.image.url="https://jarbashivemind.github.io/HiveMind-community-docs/" \
+      org.opencontainers.image.ref.name="${REGISTRY}/hivemind-listener:${TAG}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
 
 ARG ALPHA=false
+ARG UV_PRERELEASE=allow
 ARG USER=hivemind
 
-COPY --chown=${USER}:${USER} files/requirements.txt /tmp/requirements.txt
+ENV HIVEMIND_WEBSOCKET_PING_INTERVAL=25 \
+    HIVEMIND_WEBSOCKET_PING_TIMEOUT=10
 
-RUN if [ "${ALPHA}" == "true" ]; then \
-  pip3 install -r /tmp/requirements.txt --pre; \
-  else \
-  pip3 install -r /tmp/requirements.txt; \
-  fi \
-  && mkdir -p ${HOME}/.config/hivemind ${HOME}/.local/share/hivemind \
-  && rm -rf ${HOME}/.cache /tmp/requirements.txt
+COPY files/requirements.txt /tmp/requirements.txt
+COPY files/agent-requirements.txt /tmp/agent-requirements.txt
+COPY vendor/ /tmp/vendor/
+COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
+COPY files/install_listener_compat.py /tmp/install_listener_compat.py
+COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
+COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
+COPY files/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl /tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
 
-ENTRYPOINT ["hivemind-core", "listen"]
+USER root
 
-WORKDIR /home/${USER}
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update \
+ && apt-get install -o Dpkg::Options::="--force-confold" -y --no-install-recommends --no-install-suggests \
+      build-essential python3-dev \
+ && PRERELEASE="${UV_PRERELEASE}" \
+ && if [ "${ALPHA}" = "true" ]; then PRERELEASE="allow"; fi \
+ && if [ -f /run/secrets/github_token ]; then \
+      GITHUB_TOKEN="$(cat /run/secrets/github_token)" \
+      && git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi \
+ && uv pip install --prerelease="${PRERELEASE}" \
+      --reinstall-package hivemind-bus-client \
+      --reinstall-package hivemind-plugin-manager \
+      --reinstall-package hivemind-websocket-protocol \
+      --reinstall-package hivemind-core \
+      --reinstall-package hivemind-http-protocol \
+      --reinstall-package hivemind-mqtt-protocol \
+      --reinstall-package hivemind-audio-binary-protocol \
+      --reinstall-package hivemind-redis-database \
+      -r /tmp/requirements.txt \
+ && uv pip install --prerelease="${PRERELEASE}" --no-deps \
+      --reinstall-package ovos-bus-client \
+      --reinstall-package hivemind-ovos-agent-plugin \
+      -r /tmp/agent-requirements.txt \
+ && "/home/${USER}/.venv/bin/python" /tmp/patch_hivemind_ovos_agent.py \
+ && "/home/${USER}/.venv/bin/python" /tmp/install_listener_compat.py \
+ && if [ -n "${GITHUB_TOKEN:-}" ]; then \
+      git config --global --remove-section url."https://x-access-token:${GITHUB_TOKEN}@github.com/" || true; \
+    fi \
+ && rm -f /root/.gitconfig \
+ && mkdir -p \
+      "/home/${USER}/.config/hivemind" \
+      "/home/${USER}/.config/hivemind-core" \
+      "/home/${USER}/.local/hivemind" \
+      "/home/${USER}/.local/share/hivemind" \
+      "/home/${USER}/.local/state/hivemind" \
+ && chown "${USER}:${USER}" -R "/home/${USER}" \
+ && apt-get --purge remove -y build-essential python3-dev \
+ && apt-get --purge autoremove -y \
+ && rm -rf /var/log/{apt,dpkg.log} /tmp/* /var/tmp/*
+
+RUN "/home/${USER}/.venv/bin/python" -c "\
+import importlib.metadata as metadata, subprocess, sys; \
+import inspect; \
+import hivemind_ovos_agent_plugin as agent_plugin; \
+import thalovant_hivemind_listener_compat as listener_compat; \
+from hivemind_bus_client.client import HiveMessageBusClient; \
+from hivemind_core.service import get_agent_protocol; \
+from hivemind_websocket_protocol import HiveMindWebsocketProtocol; \
+from packaging.version import Version; \
+subprocess.run([sys.executable, '-m', 'pip', 'check'], check=True); \
+version = lambda package: metadata.version(package); \
+settings = HiveMindWebsocketProtocol(config={})._websocket_ping_settings(); \
+assert settings.get('websocket_ping_interval', 0) > 0, 'hivemind-websocket-protocol keepalive is not enabled'; \
+assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-bus-client keepalive support is missing'; \
+assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
+assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
+assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
+assert Version('2.0.0a3') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must remain on the production 2.x line'; \
+assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
+assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
+listener_compat.install(); \
+from hivemind_core.database import ClientDatabase; \
+from hivemind_plugin_manager.database import AbstractDB, Client; \
+assert Version(version('hivemind-plugin-manager')) >= Version('0.7.1a3'), 'hivemind-plugin-manager must include listener policy compatibility shims'; \
+assert hasattr(AbstractDB, 'refresh'), 'hivemind-plugin-manager database refresh support is missing'; \
+assert hasattr(ClientDatabase, 'refresh'), 'listener compat must expose ClientDatabase.refresh before policy admission'; \
+assert Client(client_id=1, api_key='k').message_blacklist == [], 'Client.message_blacklist compatibility shim is missing'; \
+send_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_send); \
+internal_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_internal_mycroft); \
+assert 'list(self.clients.items())' in send_source, 'agent send fan-out must snapshot clients'; \
+assert '.get(peer)' in send_source, 'agent direct send must tolerate disconnect races'; \
+assert 'list(self.clients.items())' in internal_source, 'agent internal mycroft routing must snapshot clients'; \
+agent_class, _ = get_agent_protocol(); \
+assert agent_class.__name__ == 'OVOSAgentProtocol', f'unexpected agent protocol resolved: {agent_class.__name__}'"
+
+USER "$USER"
+
+ENTRYPOINT ["/bin/bash", "/usr/local/bin/entrypoint.sh"]
+
+WORKDIR "/home/${USER}"

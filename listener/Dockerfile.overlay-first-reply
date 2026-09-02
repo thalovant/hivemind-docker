@@ -1,0 +1,69 @@
+FROM ghcr.io/thalovant/hivemind-listener:query-ultrafast-20260707-hc30f147d-ag5604542-mqd26d810-dt2a4778e@sha256:c3ae53c7675ea82bdc05c919f98a1927d6bcd9335fb635dafaa987b4007f893f
+
+ARG USER=hivemind
+ARG VERSION=unknown
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
+USER root
+
+COPY files/hivemind_ovos_agent_plugin-0.3.2a3-py3-none-any.whl /tmp/hivemind_ovos_agent_plugin-0.3.2a3-py3-none-any.whl
+COPY files/hivemind_core-4.10.1a1-py3-none-any.whl /tmp/hivemind_core-4.10.1a1-py3-none-any.whl
+COPY files/hivemind_redis_database-0.1.0a4-py3-none-any.whl /tmp/hivemind_redis_database-0.1.0a4-py3-none-any.whl
+COPY files/hivemind_websocket_protocol-0.2.2a1-py3-none-any.whl /tmp/hivemind_websocket_protocol-0.2.2a1-py3-none-any.whl
+
+RUN "/home/${USER}/.venv/bin/python" -m pip install --no-cache-dir --no-deps --force-reinstall \
+      /tmp/hivemind_core-4.10.1a1-py3-none-any.whl \
+      /tmp/hivemind_ovos_agent_plugin-0.3.2a3-py3-none-any.whl \
+      /tmp/hivemind_redis_database-0.1.0a4-py3-none-any.whl \
+      /tmp/hivemind_websocket_protocol-0.2.2a1-py3-none-any.whl \
+ && "/home/${USER}/.venv/bin/python" -m pip check \
+ && "/home/${USER}/.venv/bin/python" -c "\
+import inspect; \
+import redis; \
+from hivemind_core.protocol import HiveMindListenerProtocol; \
+from hivemind_core.workers import BoundedWorkerPool; \
+from hivemind_ovos_agent_plugin import OVOSAgentProtocol, QUERY_SPEAK_EVENTS; \
+from hivemind_redis_database import RedisDB; \
+from hivemind_websocket_protocol import HiveMindTornadoWebSocket; \
+assert hasattr(HiveMindListenerProtocol, '_submit_query_worker'); \
+assert '_submit_query_worker' in inspect.getsource(HiveMindListenerProtocol.handle_query_message); \
+assert BoundedWorkerPool.__name__ in inspect.getsource(HiveMindListenerProtocol._submit_query_worker); \
+assert 'queue_size' in inspect.signature(BoundedWorkerPool).parameters; \
+assert hasattr(HiveMindListenerProtocol, 'update_last_seen'); \
+assert 'last_seen_update_interval' in inspect.getsource(HiveMindListenerProtocol.__post_init__); \
+assert '_last_seen_updates' in inspect.getsource(HiveMindListenerProtocol.update_last_seen); \
+assert 'time.monotonic' in inspect.getsource(HiveMindListenerProtocol.update_last_seen); \
+assert hasattr(OVOSAgentProtocol, '_configured_complete_on_first_response'); \
+assert hasattr(OVOSAgentProtocol, '_configured_direct_query_routes'); \
+assert hasattr(OVOSAgentProtocol, '_configured_direct_query_api_response_events'); \
+assert hasattr(OVOSAgentProtocol, '_direct_query_event_for'); \
+assert hasattr(OVOSAgentProtocol, '_direct_query_route_for'); \
+assert hasattr(OVOSAgentProtocol, '_build_query_api_message'); \
+assert hasattr(OVOSAgentProtocol, '_send_query_message'); \
+assert hasattr(OVOSAgentProtocol, '_query_id_from_message'); \
+assert hasattr(OVOSAgentProtocol, '_configured_bus_endpoint_sources'); \
+assert '_bus_endpoint_sources' in inspect.getsource(OVOSAgentProtocol._replace_bus); \
+assert 'has_errored' in inspect.getsource(OVOSAgentProtocol._bus_socket_is_connected); \
+source = inspect.getsource(OVOSAgentProtocol.natural_language_query); \
+assert '_configured_complete_on_first_response' in source; \
+assert '_direct_query_route_for' in source; \
+assert '_build_query_api_message' in source; \
+assert 'recognizer_loop:utterance' in source; \
+assert 'query_done_grace' in inspect.getsource(OVOSAgentProtocol._configured_query_done_grace); \
+assert 'ovos.utterance.speak' in QUERY_SPEAK_EVENTS; \
+assert RedisDB.max_connections == 64; \
+assert redis.BlockingConnectionPool.__name__ in inspect.getsource(RedisDB._create_single_connection); \
+assert HiveMindTornadoWebSocket._message_workers == 8; \
+assert HiveMindTornadoWebSocket._message_queue_size == 64; \
+assert hasattr(HiveMindTornadoWebSocket, '_drain_inbound_messages'); \
+assert '_executor().submit' in inspect.getsource(HiveMindTornadoWebSocket.on_message); \
+print('async query + last-seen debounce + redis pool + first-reply + websocket worker overlay checks passed')" \
+ && rm -f /tmp/hivemind_core-4.10.1a1-py3-none-any.whl \
+	          /tmp/hivemind_ovos_agent_plugin-0.3.2a3-py3-none-any.whl \
+	          /tmp/hivemind_redis_database-0.1.0a4-py3-none-any.whl \
+	          /tmp/hivemind_websocket_protocol-0.2.2a1-py3-none-any.whl
+
+USER "$USER"

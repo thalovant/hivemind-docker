@@ -1,2 +1,3 @@
 git+https://github.com/JarbasHiveMind/HiveMind-cli.git
-git+https://github.com/JarbasHiveMind/HiveMind-core.git
+hivemind-core
+lxml>=5.1.0
