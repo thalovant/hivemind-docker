@@ -115,7 +115,7 @@ assert hasattr(ClientDatabase, 'refresh'), 'listener compat must expose ClientDa
 assert Client(client_id=1, api_key='k').message_blacklist == [], 'Client.message_blacklist compatibility shim is missing'; \
 send_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_send); \
 internal_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_internal_mycroft); \
-assert 'list(self.clients.items())' in send_source, 'agent send fan-out must snapshot clients'; \
+assert ('list(self.clients.items())' in send_source or 'list(self.clients.values())' in send_source), 'agent send fan-out must snapshot clients'; \
 assert '.get(peer)' in send_source, 'agent direct send must tolerate disconnect races'; \
 assert 'list(self.clients.items())' in internal_source, 'agent internal mycroft routing must snapshot clients'; \
 agent_class, _ = get_agent_protocol(); \

@@ -194,8 +194,46 @@ class TestSession(unittest.TestCase):
         self.assertIsInstance(serialized['context'], dict)
 
     def test_from_message(self):
-        # TODO
-        pass
+        from ovos_bus_client.session import (Session, SessionManager,
+                                             MalformedSession)
+        from ovos_bus_client.message import Message
+
+        # a well-formed session deserializes identically to a direct call
+        well_formed = Session("sid-wf", lang="pt-PT")
+        msg = Message("test", context={"session": well_formed.serialize()})
+        got = Session.from_message(msg)
+        self.assertIsInstance(got, Session)
+        self.assertEqual(got.session_id, "sid-wf")
+        self.assertEqual(got.lang, "pt-PT")
+
+        # SESSION-1 §2.5: a present-but-malformed (non-object) session carrier is
+        # a producer error — rejected with MalformedSession, never silently
+        # defaulted. The inbound handler catches this to drop the one message; it
+        # is a ValueError, so it never escapes as an unhandled TypeError that
+        # would tear the connection down.
+        for bad in ("oops", 42, ["a", "b"]):
+            msg = Message("test", context={"session": bad})
+            with self.assertRaises(MalformedSession):
+                Session.from_message(msg)
+
+        # an explicit null carrier is absence, not malformation (§2.1) -> default
+        msg = Message("test", context={"session": None})
+        got = Session.from_message(msg)
+        self.assertIsInstance(got, Session)
+        self.assertEqual(got.session_id,
+                         SessionManager.get_default_session().session_id)
+
+        # a dict missing every field is well-formed (all fields omissible):
+        # it deserializes without raising, the consumer filling its own
+        # deployment defaults (§2.1)
+        msg = Message("test", context={"session": {}})
+        got = Session.from_message(msg)
+        self.assertIsInstance(got, Session)
+        self.assertTrue(got.session_id)
+
+        # no session key at all -> default session
+        got = Session.from_message(Message("test", context={}))
+        self.assertIsInstance(got, Session)
 
 
 class TestSessionManager(unittest.TestCase):
@@ -213,12 +251,91 @@ class TestSessionManager(unittest.TestCase):
         # TODO
 
     def test_update(self):
-        # TODO
-        pass
+        from ovos_bus_client.session import Session
+        sess = Session("sid-update")
+        # update returns the canonical (singleton) object for the id
+        canonical = self.SessionManager.update(sess)
+        self.assertIs(canonical, sess)
+        self.assertIs(self.SessionManager.sessions["sid-update"], sess)
 
-    def test_get(self):
-        # TODO - rewrite test, .get has no side effects now, lang update happens in ovos-core
-        pass
+        # a second snapshot for the same id is folded onto the singleton in
+        # place — the original object identity is preserved, not replaced
+        snapshot = Session("sid-update")
+        snapshot.lang = "pt-PT"
+        returned = self.SessionManager.update(snapshot)
+        self.assertIs(returned, sess)
+        self.assertIsNot(returned, snapshot)
+        self.assertEqual(sess.lang, "pt-PT")
+
+    def test_get_returns_singleton(self):
+        from ovos_bus_client.session import Session
+        from ovos_bus_client.message import Message
+        sess = Session("sid-get")
+        msg = Message("test", context={"session": sess.serialize()})
+
+        first = self.SessionManager.get(msg)
+        second = self.SessionManager.get(msg)
+        # every get() for the same id hands back the one live object, even
+        # though each message carries its own serialized snapshot
+        self.assertIs(first, second)
+        self.assertIs(self.SessionManager.sessions["sid-get"], first)
+
+    def test_held_reference_observes_later_mutation(self):
+        # the corner case the singleton fixes: a reference taken early in a
+        # flow must see a flag flipped through a later snapshot of the same id
+        from ovos_bus_client.session import Session
+        from ovos_bus_client.message import Message
+        held = self.SessionManager.get(
+            Message("a", context={"session": Session("sid-flag").serialize()}))
+        self.assertFalse(held.is_speaking)
+
+        speaking = Session("sid-flag")
+        speaking.is_speaking = True
+        self.SessionManager.update(speaking)
+        # the early reference observes the mutation without being re-fetched
+        self.assertTrue(held.is_speaking)
+
+    def test_forward_stamps_live_bus_session(self):
+        # bus-client land: get -> mutate -> forward; the derived message carries
+        # the LIVE bus Session for its id (refresh, not the pre-mutation copy).
+        from ovos_bus_client.session import Session
+        from ovos_bus_client.message import Message
+        live = self.SessionManager.get(
+            Message("a", context={"session": Session("sid-fwd").serialize()}))
+        live.activate_skill("my.skill")
+        derived = Message("utt", context={"session": {"session_id": "sid-fwd"}}
+                          ).forward("my.skill.activate")
+        skills = [s[0] for s in
+                  Session.deserialize(derived.context["session"]).active_skills]
+        self.assertIn("my.skill", skills)
+
+    def test_update_from_present_empty_overrides(self):
+        # SESSION-1 §2: a snapshot that carries an (empty) value for a field
+        # overrides the live session's value — folding is spec-deserialization,
+        # not a self-preserving merge that keeps stale state.
+        from ovos_bus_client.session import Session
+        from ovos_bus_client.message import Message
+        held = self.SessionManager.get(
+            Message("a", context={"session": Session("sid-clear").serialize()}))
+        held.activate_skill("skill.foo")
+        self.assertTrue(held.active_skills)
+
+        # a later snapshot with no active skills must clear the singleton
+        self.SessionManager.update(Session("sid-clear"))
+        self.assertEqual(held.active_skills, [])
+
+    def test_update_from_does_not_alias_nested_state(self):
+        # round-tripping through (de)serialize rebuilds nested objects, so the
+        # live singleton never shares mutable sub-objects with the snapshot.
+        from ovos_bus_client.session import Session
+        live = Session("sid-alias")
+        snapshot = Session("sid-alias")
+        snapshot.activate_skill("skill.bar")
+        live.update_from(snapshot)
+        self.assertTrue(live.active_skills)
+        # mutating the snapshot afterwards must not leak into the live object
+        snapshot.active_handlers.clear()
+        self.assertTrue(live.active_skills)
 
     def test_touch(self):
         # TODO

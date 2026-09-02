@@ -138,11 +138,17 @@ details and the multi-handler `collect_responses` flow.
 |---|---|
 | `bus.close()` | Initiate disconnect; safe to call multiple times (`client.py:365`). |
 | Socket dropped by server | `on_close` clears `connected_event`. `run_forever` returns. |
-| `on_error` | Logs the exception; the websocket-client library handles reconnection separately. |
+| `on_error` | Closes the client, waits, and reconnects itself (see below). |
 
-`MessageBusClient` does **not** auto-reconnect on disconnect by itself. If you
-need a long-lived resilient client, wrap construction in a retry loop or use a
-supervisor (systemd, etc.).
+`MessageBusClient` auto-reconnects on any socket error (`client.py:202-246`,
+`on_error`): it closes the client, sleeps `self.retry` seconds, then calls
+`create_client()` again. The retry delay starts at 5 seconds, doubles on each
+further failure up to a 60-second cap, and resets to 5 seconds after a
+successful reconnect. You do not need to wrap construction in your own retry
+loop for this. See the manual's
+[Bus Service: reconnect behavior](https://tigregotico.github.io/ovos-technical-manual/bus-service/#bus-restart-reconnect-behavior)
+for the full backoff details, including what happens to in-flight calls and
+messages sent during an outage.
 
 ## `GUIWebsocketClient` — `client.py:380`
 
@@ -213,3 +219,16 @@ worked example of a subclass that overrides `emit`, `on_open`, and
 If you find yourself reaching for deeper hooks, ask whether a transport plugin
 is what you actually want — that is what `hivemind-ovos-agent-plugin` and the
 GUI client are doing structurally.
+
+## Async alternative
+
+`MessageBusClient` is synchronous. For an asyncio-native client with the same
+shape, see [`AsyncMessageBusClient`](async_client.md). It's an optional extra:
+
+```bash
+pip install ovos-bus-client[async]
+```
+
+Use it when your application is already async (FastAPI, aiohttp, Discord bots,
+etc.) and you want `await bus.emit(...)`, `await bus.wait_for_response(...)`,
+`async for msg in collector` instead of threads and blocking calls.
