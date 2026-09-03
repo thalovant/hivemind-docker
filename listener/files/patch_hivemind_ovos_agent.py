@@ -23,7 +23,17 @@ def main() -> None:
 
     path = Path(spec.origin)
     source = path.read_text()
-    if "_send_to_client" in source and "list(self.clients.items())" in source:
+    # hivemind-ovos-agent-plugin 0.3.9a1 landed this upstream, in a different
+    # textual shape than the rewrites below. What has to hold is the reason the
+    # patch exists: the fan-out iterates a snapshot rather than the live dict,
+    # and a direct send tolerates a peer disconnecting mid-dispatch. Check those
+    # instead of a marker name, and only rewrite when the racy form is present.
+    already_safe = (
+        "list(self.clients.items())" in source
+        and "self.clients.get(peer)" in source
+        and "for peer in self.clients:" not in source
+    )
+    if already_safe:
         return
 
     replacements = {

@@ -197,7 +197,10 @@ class TestSessionSkillManagement(TestCase):
         s.enable_response_mode("skill.a")
         self.assertEqual(s.utterance_states["skill.a"], UtteranceState.RESPONSE.value)
         s.disable_response_mode("skill.a")
-        self.assertEqual(s.utterance_states["skill.a"], UtteranceState.INTENT.value)
+        # OVOS-CONVERSE-1 §2.2: a non-holder is implicitly INTENT (absent from the
+        # legacy utterance_states view); ecosystem readers use .get(id, INTENT).
+        self.assertEqual(s.utterance_states.get("skill.a", UtteranceState.INTENT.value),
+                         UtteranceState.INTENT.value)
 
 
 class TestSessionSerialization(TestCase):
@@ -205,7 +208,9 @@ class TestSessionSerialization(TestCase):
         _reset_session_manager()
 
     def test_serialize_includes_all_keys(self):
-        s = Session("sid", lang="pt-pt", site_id="kitchen", persona_id="p1")
+        s = Session("sid", lang="pt-pt", site_id="kitchen", persona_id="p1",
+                    blacklisted_skills=["bad.skill"],
+                    blacklisted_intents=["bad:intent"])
         d = s.serialize()
         for key in ["active_skills", "utterance_states", "session_id",
                     "persona_id", "lang", "context", "site_id", "pipeline",
@@ -216,6 +221,17 @@ class TestSessionSerialization(TestCase):
         self.assertEqual(d["session_id"], "sid")
         self.assertEqual(d["persona_id"], "p1")
         self.assertEqual(d["site_id"], "kitchen")
+
+    def test_serialize_omits_empty_blacklists(self):
+        # SESSION-1 §3.4: an empty list-valued override field is wire-equivalent
+        # to omission, so it is absent from the wire, never forced to ``[]``.
+        s = Session("sid")
+        # set post-construction to bypass the config-default fallback
+        s.blacklisted_skills = []
+        s.blacklisted_intents = []
+        d = s.serialize()
+        self.assertNotIn("blacklisted_skills", d)
+        self.assertNotIn("blacklisted_intents", d)
 
     def test_deserialize_roundtrip(self):
         s = Session("sid", lang="en-us", site_id="lab")
@@ -238,6 +254,51 @@ class TestSessionSerialization(TestCase):
         msg = Message("t", context={})
         sess = Session.from_message(msg)
         self.assertEqual(sess.session_id, "default")
+
+
+class TestSiteIdAbsence(TestCase):
+    """OVOS-BRIDGE-1 §3.3: an unset site_id MUST stay absent (not fabricated
+    as a sentinel such as "unknown"), and a present site_id MUST survive every
+    forward / reply / response derivation unchanged."""
+
+    def setUp(self):
+        _reset_session_manager()
+
+    def test_unset_site_id_is_none_not_sentinel(self):
+        s = Session("sid")
+        self.assertIsNone(s.site_id)
+        self.assertNotEqual(s.site_id, "unknown")
+
+    def test_unset_site_id_omitted_from_wire(self):
+        # §3.3: an absent site_id MUST NOT be emitted as a value (not as
+        # JSON null, not as a fabricated sentinel) — the key is omitted.
+        s = Session("sid")
+        self.assertNotIn("site_id", s.serialize())
+
+    def test_absent_site_id_stays_absent_through_deserialize(self):
+        s = Session("sid")
+        restored = Session.deserialize(s.serialize())
+        self.assertIsNone(restored.site_id)
+        self.assertNotIn("site_id", restored.serialize())
+
+    def test_deserialize_payload_without_site_id_stays_absent(self):
+        # a wire payload that never carried site_id must not gain "unknown"
+        restored = Session.deserialize({"session_id": "sid"})
+        self.assertIsNone(restored.site_id)
+
+    def test_present_site_id_survives_forward(self):
+        s = Session("sid", site_id="kitchen")
+        msg = Message("orig", context={"session": s.serialize()})
+        fwd = msg.forward("downstream")
+        sess = Session.from_message(fwd)
+        self.assertEqual(sess.site_id, "kitchen")
+
+    def test_present_site_id_survives_reply_and_response(self):
+        s = Session("sid", site_id="lab")
+        msg = Message("orig", context={"session": s.serialize()})
+        for derived in (msg.reply("answer"), msg.response()):
+            sess = Session.from_message(derived)
+            self.assertEqual(sess.site_id, "lab")
 
     def test_from_message_falls_back_when_none(self):
         _reset_session_manager()
@@ -267,10 +328,14 @@ class TestSessionManager(TestCase):
         self.assertIs(SessionManager.sessions["upd"], s)
 
     def test_update_make_default(self):
+        # "default" is a singleton: make_default folds the snapshot onto the
+        # existing default session (preserving its identity) and returns that
+        # canonical object, rather than swapping in a disconnected one.
         s = Session("foo")
-        SessionManager.update(s, make_default=True)
+        canonical = SessionManager.update(s, make_default=True)
         self.assertEqual(s.session_id, "default")
-        self.assertIs(SessionManager.default_session, s)
+        self.assertIs(SessionManager.default_session, canonical)
+        self.assertIs(SessionManager.sessions["default"], canonical)
 
     def test_update_raises_on_none(self):
         with self.assertRaises(ValueError):
