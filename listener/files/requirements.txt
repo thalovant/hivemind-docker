@@ -17,3 +17,7 @@ setuptools
 # and no longer does, so a from-scratch build failed with ModuleNotFoundError
 # regardless of any version change.
 packaging
+# Per-satellite conversation journal: a policy plugin, so it observes every
+# admitted message after forwarding rather than sitting in the reply path.
+# Inert without a redis_url/storage, so installing it is safe for every hub.
+hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@e9e91c7e6a3920e67866ee5b2c57926a3c5d1a85
