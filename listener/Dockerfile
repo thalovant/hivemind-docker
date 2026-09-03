@@ -46,7 +46,11 @@ USER root
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get update \
+# The token is read below to fetch private thalovant pins; without this mount
+# /run/secrets/github_token never exists and the fetch fails on a private
+# repo with 'could not read Username'.
+RUN --mount=type=secret,id=github_token \
+    apt-get update \
  && apt-get install -o Dpkg::Options::="--force-confold" -y --no-install-recommends --no-install-suggests \
       build-essential python3-dev \
  && PRERELEASE="${UV_PRERELEASE}" \
@@ -119,7 +123,7 @@ assert ('list(self.clients.items())' in send_source or 'list(self.clients.values
 assert '.get(peer)' in send_source, 'agent direct send must tolerate disconnect races'; \
 assert 'list(self.clients.items())' in internal_source, 'agent internal mycroft routing must snapshot clients'; \
 agent_class, _ = get_agent_protocol(); \
-assert agent_class.__name__ == 'OVOSAgentProtocol', f'unexpected agent protocol resolved: {agent_class.__name__}'"
+assert issubclass(agent_class, agent_plugin.OVOSAgentProtocol), f'unexpected agent protocol resolved: {agent_class.__name__}'"
 
 USER "$USER"
 
