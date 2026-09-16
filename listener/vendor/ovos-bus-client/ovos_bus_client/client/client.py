@@ -1120,10 +1120,15 @@ class GUIWebsocketClient(MessageBusClient):
             self.connected_event.wait()
 
         try:
-            if hasattr(message, 'serialize'):
-                self.client.send(_maybe_encrypt(message.serialize()))
-            else:
-                self.client.send(_maybe_encrypt(json_dumps(message.__dict__)))
+            # The same lock the ordinary emit path takes. websocket-client
+            # makes no message-level ordering promise, so two threads sending
+            # on one socket can interleave frames; the GUI socket is no
+            # different, and this was the one send that skipped it.
+            with self._send_lock:
+                if hasattr(message, 'serialize'):
+                    self.client.send(_maybe_encrypt(message.serialize()))
+                else:
+                    self.client.send(_maybe_encrypt(json_dumps(message.__dict__)))
         except WebSocketConnectionClosedException:
             LOG.warning('Could not send %s message because connection '
                         'has been closed', message.msg_type)
