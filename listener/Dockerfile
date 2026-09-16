@@ -50,21 +50,27 @@ SHELL ["/bin/bash", "-c"]
 # /run/secrets/github_token never exists and the fetch fails on a private
 # repo with 'could not read Username'.
 #
-# The token is embedded in a global git URL rewrite for the length of this RUN,
-# which is what lets uv fetch the git+https pins in requirements.txt. Two things
-# then have to go before the layer commits: /root/.gitconfig, which holds the
-# rewrite, and uv's cache, because a cached git checkout records its remote --
-# token and all -- in its own .git/config. Nothing outside this RUN can remove
-# either: a later RUN would delete them from a layer that already shipped them.
-RUN --mount=type=secret,id=github_token \
+# It reaches git through GIT_ASKPASS, the way upstream hivemind-docker does it,
+# so it is never written into a git config or into a URL -- which means a
+# cached git checkout cannot record it in its own .git/config. uv's cache is a
+# BuildKit cache mount for the same reason: it is shared between builds and
+# never committed to the image layer.
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    --mount=type=secret,id=github_token \
     apt-get update \
  && apt-get install -o Dpkg::Options::="--force-confold" -y --no-install-recommends --no-install-suggests \
       build-essential python3-dev \
  && PRERELEASE="${UV_PRERELEASE}" \
  && if [ "${ALPHA}" = "true" ]; then PRERELEASE="allow"; fi \
- && if [ -f /run/secrets/github_token ]; then \
-      GITHUB_TOKEN="$(cat /run/secrets/github_token)" \
-      && git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+ && if [ -s /run/secrets/github_token ]; then \
+      printf '%s\n' \
+        '#!/bin/sh' \
+        'case "$1" in' \
+        '  *Username*) echo x-access-token ;;' \
+        '  *Password*) cat /run/secrets/github_token ;;' \
+        'esac' > /tmp/git-askpass \
+      && chmod 0700 /tmp/git-askpass \
+      && export GIT_ASKPASS=/tmp/git-askpass GIT_TERMINAL_PROMPT=0; \
     fi \
  && uv pip install --prerelease="${PRERELEASE}" \
       --reinstall-package hivemind-bus-client \
@@ -82,11 +88,7 @@ RUN --mount=type=secret,id=github_token \
       -r /tmp/agent-requirements.txt \
  && "/home/${USER}/.venv/bin/python" /tmp/patch_hivemind_ovos_agent.py \
  && "/home/${USER}/.venv/bin/python" /tmp/install_listener_compat.py \
- && if [ -n "${GITHUB_TOKEN:-}" ]; then \
-      git config --global --remove-section url."https://x-access-token:${GITHUB_TOKEN}@github.com/" || true; \
-    fi \
- && rm -f /root/.gitconfig \
- && rm -rf /root/.cache/uv "/home/${USER}/.cache/uv" \
+ && rm -f /tmp/git-askpass \
  && mkdir -p \
       "/home/${USER}/.config/hivemind" \
       "/home/${USER}/.config/hivemind-core" \
@@ -96,7 +98,7 @@ RUN --mount=type=secret,id=github_token \
  && chown "${USER}:${USER}" -R "/home/${USER}" \
  && apt-get --purge remove -y build-essential python3-dev \
  && apt-get --purge autoremove -y \
- && rm -rf /var/log/{apt,dpkg.log} /tmp/* /var/tmp/* /root/.cache
+ && rm -rf /var/log/{apt,dpkg.log} /tmp/* /var/tmp/*
 
 RUN "/home/${USER}/.venv/bin/python" -c "\
 import importlib.metadata as metadata, subprocess, sys; \
