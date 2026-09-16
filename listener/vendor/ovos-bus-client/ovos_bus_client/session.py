@@ -1253,7 +1253,16 @@ class Session(_SpecSession):
         # modern peer that carries both keys is never overridden (canonical
         # wins, no double-count). ``from_dict`` above already populated
         # ``intent_context`` in ``canonical_kwargs`` when present.
-        context = IntentContextManager.deserialize(data.get("context", {}))
+        try:
+            context = IntentContextManager.deserialize(data.get("context", {}))
+        except (AttributeError, TypeError, ValueError) as error:
+            # Same contract as the carrier itself: a malformed session is
+            # rejected as MalformedSession so the inbound reader drops the one
+            # message. Letting the parser's own error escape took the transport
+            # down instead, which is a peer's bad frame closing our connection.
+            raise MalformedSession(
+                f"session carries a malformed intent context: {error}"
+            ) from error
         location = data.get("location", {})
         system_unit = data.get("system_unit")
         date_format = data.get("date_format")
@@ -1314,7 +1323,7 @@ class Session(_SpecSession):
                       f"`message.context` where emitted. "
                       f"context={message.context}")
         else:
-            LOG.warning(f"No message found, using default session")
+            LOG.warning("No message found, using default session")
         # no session on the message -> the default session
         return SessionManager.get_default_session()
 
