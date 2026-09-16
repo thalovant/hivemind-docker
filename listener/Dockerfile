@@ -49,6 +49,13 @@ SHELL ["/bin/bash", "-c"]
 # The token is read below to fetch private thalovant pins; without this mount
 # /run/secrets/github_token never exists and the fetch fails on a private
 # repo with 'could not read Username'.
+#
+# The token is embedded in a global git URL rewrite for the length of this RUN,
+# which is what lets uv fetch the git+https pins in requirements.txt. Two things
+# then have to go before the layer commits: /root/.gitconfig, which holds the
+# rewrite, and uv's cache, because a cached git checkout records its remote --
+# token and all -- in its own .git/config. Nothing outside this RUN can remove
+# either: a later RUN would delete them from a layer that already shipped them.
 RUN --mount=type=secret,id=github_token \
     apt-get update \
  && apt-get install -o Dpkg::Options::="--force-confold" -y --no-install-recommends --no-install-suggests \
@@ -79,6 +86,7 @@ RUN --mount=type=secret,id=github_token \
       git config --global --remove-section url."https://x-access-token:${GITHUB_TOKEN}@github.com/" || true; \
     fi \
  && rm -f /root/.gitconfig \
+ && rm -rf /root/.cache/uv "/home/${USER}/.cache/uv" \
  && mkdir -p \
       "/home/${USER}/.config/hivemind" \
       "/home/${USER}/.config/hivemind-core" \
@@ -88,7 +96,7 @@ RUN --mount=type=secret,id=github_token \
  && chown "${USER}:${USER}" -R "/home/${USER}" \
  && apt-get --purge remove -y build-essential python3-dev \
  && apt-get --purge autoremove -y \
- && rm -rf /var/log/{apt,dpkg.log} /tmp/* /var/tmp/*
+ && rm -rf /var/log/{apt,dpkg.log} /tmp/* /var/tmp/* /root/.cache
 
 RUN "/home/${USER}/.venv/bin/python" -c "\
 import importlib.metadata as metadata, subprocess, sys; \
