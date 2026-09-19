@@ -1,9 +1,19 @@
-# ovos-bus-client stays vendored: the listener needs a send lock, emit_checked
-# and shared session stamping that upstream does not carry, and there is no
-# thalovant fork to pin. The tree here is upstream 2.10.1a1 with
-# OpenVoiceOS/ovos-bus-client#276 and those three changes re-applied.
-ovos-bus-client @ file:///tmp/vendor/ovos-bus-client
-# hivemind-ovos-agent-plugin no longer needs vendoring: it was only pinned to a
-# git commit that upstream deleted, and 0.3.9a1 on PyPI supports the
-# hivemind-bus-client 1.x line this image now runs.
-hivemind-ovos-agent-plugin==0.3.10a1
+# ovos-bus-client is no longer vendored.
+#
+# The vendored tree was upstream 2.10.1a1 with four changes. Checked against
+# stock 2.11.18a1, every one of them is obsolete:
+#
+#   counterpart snapshot   -- upstream carries it
+#   _ensure_session        -- upstream does the same job in _own_session()
+#   _send_lock             -- superseded by the async sender: _send() enqueues
+#                             and a single _drain_sender thread owns the socket,
+#                             so concurrent emit() cannot race a send
+#   emit_checked           -- DEAD CODE. Nothing called it: not hivemind-core,
+#                             not the agent plugin, not the listener. Its only
+#                             definition was the vendored client itself.
+#
+# 2.11.18a1 also carries OpenVoiceOS/ovos-bus-client#357, which is what the
+# listener overlay's messagebus reconnect patch exists to substitute for. With
+# this pin that patch can retire.
+ovos-bus-client==2.11.18a1
+hivemind-ovos-agent-plugin==0.5.0a1

@@ -1,23 +1,28 @@
-poorman-handshake @ git+https://github.com/JarbasHiveMind/poorman_handshake.git@384dff913019ebc9f526c3f0299e9d582b5db3ef
-hivemind-bus-client @ git+https://github.com/JarbasHiveMind/hivemind-websocket-client.git@0c1d426f48fbe3ae9ca36ef7c1bbf171fa16aa36
-hivemind-plugin-manager @ git+https://github.com/JarbasHiveMind/hivemind-plugin-manager.git@f264348642ca869931fe4af55fc493d5df115dc1
-hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@b4ebaf8dbd4e4ac365e8645e5052a9f0dfa26a1b
-hivemind-core @ git+https://github.com/thalovant/HiveMind-core.git@ad3c10d2dd13c6d574dff5e803cac42ab5d9d935
-hivemind-http-protocol==0.0.11a1
-# Pinned to the fork rather than the local wheel: files/ still carried
-# 0.1.1a3, which predates the health_file readiness marker. Rebuilding from
-# it silently downgraded prod's 0.2.2a3 and left MQTT hubs unable to signal
-# ready, because the probe waits on /tmp/hivemind-mqtt-ready.
-hivemind-mqtt-protocol @ git+https://github.com/thalovant/hivemind-mqtt-protocol.git@2fb77194ac912d51d0ad3babcad53b83e4150b88
-hivemind-audio-binary-protocol==2.2.0a4
-hivemind-redis-database @ git+https://github.com/thalovant/hivemind-redis-database.git@f1e7428113b27d77402dd5f63015044a7506fff9
+# Every hivemind package is installed STOCK from PyPI at its current alpha.
+#
+# These were git pins on thalovant forks. The forks existed to carry work that
+# had not shipped yet; it has. Keeping them meant the base built a 4.x
+# hivemind-core while the platform ran 5.x, so rebuilding this repo and rolling
+# the result was a downgrade across a major version -- see
+# infra-manifests build/hivemind-listener-v3-http-overlay/PROVENANCE.md.
+#
+# A pin only earns a fork if the behaviour is NOT in a release. Check with
+# `pip download <pkg>==<latest>` and read the wheel before re-adding one.
+poorman-handshake==2.0.3a1
+hivemind-bus-client==1.2.3a1
+hivemind-plugin-manager==0.10.0a1
+hivemind-websocket-protocol==1.0.5a1
+hivemind-core==5.3.0a1
+hivemind-http-protocol==0.0.16a1
+hivemind-mqtt-protocol==0.2.5a2
+hivemind-audio-binary-protocol==2.2.2a1
+hivemind-redis-database==0.1.1a8
+# First-party and never published to PyPI, so this one stays a git pin and is
+# the only reason the build still needs a token.
+hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@66647e908a9cc9f28efa4d9576f4f64b7b7f6361
 hivemind-intent-quota-plugin[redis] @ file:///tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
 setuptools
 # The listener compat step imports packaging; it used to arrive transitively
 # and no longer does, so a from-scratch build failed with ModuleNotFoundError
 # regardless of any version change.
 packaging
-# Per-satellite conversation journal: a policy plugin, so it observes every
-# admitted message after forwarding rather than sitting in the reply path.
-# Inert without a redis_url/storage, so installing it is safe for every hub.
-hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@66647e908a9cc9f28efa4d9576f4f64b7b7f6361

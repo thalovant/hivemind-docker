@@ -17,9 +17,10 @@ RUN "/home/${USER}/.venv/bin/python" -m pip install --no-cache-dir --no-deps --f
 import importlib.metadata as metadata; \
 import inspect; \
 from hivemind_core.service import get_agent_protocol; \
+import hivemind_ovos_agent_plugin as agent_plugin; \
 import hivemind_websocket_protocol; \
 agent_class, _ = get_agent_protocol(); \
-assert agent_class.__name__ == 'OVOSAgentProtocol', f'unexpected agent protocol resolved: {agent_class.__name__}'; \
+assert issubclass(agent_class, agent_plugin.OVOSAgentProtocol), f'unexpected agent protocol resolved: {agent_class.__name__}'; \
 websocket_source = inspect.getsource(hivemind_websocket_protocol); \
 assert 'LOG.debug(f\"Received' in websocket_source, 'websocket received-message logging is not debug'; \
 assert 'LOG.info(f\"Received' not in websocket_source, 'websocket received-message logging is still info'; \
