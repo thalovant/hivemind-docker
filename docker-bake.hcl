@@ -124,6 +124,12 @@ target "listener" {
     BASE_IMAGE = "hivemind-base"
   }
 
+  # listener/Dockerfile mounts this secret to fetch the private thalovant pins
+  # (hivemind-redis-memory). It was never wired here, so the documented local
+  # build could not install them: the mount simply yielded no file and the
+  # clone failed on "could not read Username".
+  secret = ["id=github_token,env=GITHUB_TOKEN"]
+
   cache-from = ["type=registry,ref=${REGISTRY}/hivemind-listener:${TAG}"]
   cache-to   = ["type=inline"]
 }
