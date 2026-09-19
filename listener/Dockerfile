@@ -34,13 +34,12 @@ ENV HIVEMIND_WEBSOCKET_PING_INTERVAL=25 \
 
 COPY files/requirements.txt /tmp/requirements.txt
 COPY files/agent-requirements.txt /tmp/agent-requirements.txt
-COPY vendor/ /tmp/vendor/
 COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
+COPY files/patch_ovos_bus_client_session.py /tmp/patch_ovos_bus_client_session.py
 COPY files/install_listener_compat.py /tmp/install_listener_compat.py
 COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
 COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
-COPY files/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl /tmp/hivemind_mqtt_protocol-0.1.1a3-py3-none-any.whl
 
 USER root
 
@@ -49,15 +48,26 @@ SHELL ["/bin/bash", "-c"]
 # The token is read below to fetch private thalovant pins; without this mount
 # /run/secrets/github_token never exists and the fetch fails on a private
 # repo with 'could not read Username'.
-RUN --mount=type=secret,id=github_token \
+# The token reaches git through GIT_ASKPASS, so it is never written into a git
+# config or into a URL -- which means a cached git checkout cannot record it in
+# its own .git/config. uv's cache is a BuildKit cache mount for the same
+# reason: shared between builds, never committed to the image layer.
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    --mount=type=secret,id=github_token \
     apt-get update \
  && apt-get install -o Dpkg::Options::="--force-confold" -y --no-install-recommends --no-install-suggests \
       build-essential python3-dev \
  && PRERELEASE="${UV_PRERELEASE}" \
  && if [ "${ALPHA}" = "true" ]; then PRERELEASE="allow"; fi \
- && if [ -f /run/secrets/github_token ]; then \
-      GITHUB_TOKEN="$(cat /run/secrets/github_token)" \
-      && git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+ && if [ -s /run/secrets/github_token ]; then \
+      printf '%s\n' \
+        '#!/bin/sh' \
+        'case "$1" in' \
+        '  *Username*) echo x-access-token ;;' \
+        '  *Password*) cat /run/secrets/github_token ;;' \
+        'esac' > /tmp/git-askpass \
+      && chmod 0700 /tmp/git-askpass \
+      && export GIT_ASKPASS=/tmp/git-askpass GIT_TERMINAL_PROMPT=0; \
     fi \
  && uv pip install --prerelease="${PRERELEASE}" \
       --reinstall-package hivemind-bus-client \
@@ -74,10 +84,9 @@ RUN --mount=type=secret,id=github_token \
       --reinstall-package hivemind-ovos-agent-plugin \
       -r /tmp/agent-requirements.txt \
  && "/home/${USER}/.venv/bin/python" /tmp/patch_hivemind_ovos_agent.py \
+ && "/home/${USER}/.venv/bin/python" /tmp/patch_ovos_bus_client_session.py \
  && "/home/${USER}/.venv/bin/python" /tmp/install_listener_compat.py \
- && if [ -n "${GITHUB_TOKEN:-}" ]; then \
-      git config --global --remove-section url."https://x-access-token:${GITHUB_TOKEN}@github.com/" || true; \
-    fi \
+ && rm -f /tmp/git-askpass \
  && rm -f /root/.gitconfig \
  && mkdir -p \
       "/home/${USER}/.config/hivemind" \
@@ -104,11 +113,11 @@ version = lambda package: metadata.version(package); \
 settings = HiveMindWebsocketProtocol(config={})._websocket_ping_settings(); \
 assert settings.get('websocket_ping_interval', 0) > 0, 'hivemind-websocket-protocol keepalive is not enabled'; \
 assert hasattr(HiveMessageBusClient, '_websocket_keepalive_options'), 'hivemind-bus-client keepalive support is missing'; \
-assert Version(version('hivemind-websocket-protocol')) >= Version('0.2.1a4'), 'hivemind-websocket-protocol must be at least 0.2.1a4'; \
-assert Version(version('hivemind-bus-client')) >= Version('0.9.2a4'), 'hivemind-bus-client must be at least 0.9.2a4'; \
+assert version('hivemind-websocket-protocol') == '1.0.5a1', version('hivemind-websocket-protocol'); \
+assert version('hivemind-bus-client') == '1.2.3a1', version('hivemind-bus-client'); \
 assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemind-mqtt-protocol must include managed TLS trust controls'; \
-assert Version('2.0.0a3') <= Version(version('ovos-bus-client')) < Version('3.0.0'), 'ovos-bus-client must remain on the production 2.x line'; \
-assert Version(version('hivemind-core')) >= Version('4.6.7a1'), 'hivemind-core must be at least the production 4.6.7a1 release'; \
+assert version('ovos-bus-client') == '2.11.18a1', version('ovos-bus-client'); \
+assert version('hivemind-core') == '5.3.0a1', version('hivemind-core'); \
 assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
 listener_compat.install(); \
 from hivemind_core.database import ClientDatabase; \
