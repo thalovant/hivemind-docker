@@ -22,7 +22,7 @@ hivemind-redis-database==0.1.1a8
 hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@66647e908a9cc9f28efa4d9576f4f64b7b7f6361
 hivemind-intent-quota-plugin[redis] @ file:///tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
 setuptools
-# The listener compat step imports packaging; it used to arrive transitively
-# and no longer does, so a from-scratch build failed with ModuleNotFoundError
-# regardless of any version change.
+# The build-time assertion block imports packaging.version; it used to arrive
+# transitively and no longer does, so a from-scratch build failed with
+# ModuleNotFoundError regardless of any version change.
 packaging

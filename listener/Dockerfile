@@ -35,10 +35,7 @@ ENV HIVEMIND_WEBSOCKET_PING_INTERVAL=25 \
 COPY files/requirements.txt /tmp/requirements.txt
 COPY files/agent-requirements.txt /tmp/agent-requirements.txt
 COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY files/patch_hivemind_ovos_agent.py /tmp/patch_hivemind_ovos_agent.py
 COPY files/patch_ovos_bus_client_session.py /tmp/patch_ovos_bus_client_session.py
-COPY files/install_listener_compat.py /tmp/install_listener_compat.py
-COPY files/thalovant_hivemind_listener_compat.py /tmp/thalovant_hivemind_listener_compat.py
 COPY files/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl /tmp/hivemind_intent_quota_plugin-0.1.0a4-py3-none-any.whl
 
 USER root
@@ -83,9 +80,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
       --reinstall-package ovos-bus-client \
       --reinstall-package hivemind-ovos-agent-plugin \
       -r /tmp/agent-requirements.txt \
- && "/home/${USER}/.venv/bin/python" /tmp/patch_hivemind_ovos_agent.py \
  && "/home/${USER}/.venv/bin/python" /tmp/patch_ovos_bus_client_session.py \
- && "/home/${USER}/.venv/bin/python" /tmp/install_listener_compat.py \
  && rm -f /tmp/git-askpass \
  && rm -f /root/.gitconfig \
  && mkdir -p \
@@ -103,7 +98,6 @@ RUN "/home/${USER}/.venv/bin/python" -c "\
 import importlib.metadata as metadata, subprocess, sys; \
 import inspect; \
 import hivemind_ovos_agent_plugin as agent_plugin; \
-import thalovant_hivemind_listener_compat as listener_compat; \
 from hivemind_bus_client.client import HiveMessageBusClient; \
 from hivemind_core.service import get_agent_protocol; \
 from hivemind_websocket_protocol import HiveMindWebsocketProtocol; \
@@ -119,13 +113,12 @@ assert Version(version('hivemind-mqtt-protocol')) >= Version('0.1.1a3'), 'hivemi
 assert version('ovos-bus-client') == '2.11.18a1', version('ovos-bus-client'); \
 assert version('hivemind-core') == '5.3.0a1', version('hivemind-core'); \
 assert Version(version('hivemind-ovos-agent-plugin')) >= Version('0.3.2a1'), 'hivemind-ovos-agent-plugin must be at least 0.3.2a1'; \
-listener_compat.install(); \
 from hivemind_core.database import ClientDatabase; \
 from hivemind_plugin_manager.database import AbstractDB, Client; \
 assert Version(version('hivemind-plugin-manager')) >= Version('0.7.1a3'), 'hivemind-plugin-manager must include listener policy compatibility shims'; \
 assert hasattr(AbstractDB, 'refresh'), 'hivemind-plugin-manager database refresh support is missing'; \
-assert hasattr(ClientDatabase, 'refresh'), 'listener compat must expose ClientDatabase.refresh before policy admission'; \
-assert Client(client_id=1, api_key='k').message_blacklist == [], 'Client.message_blacklist compatibility shim is missing'; \
+assert hasattr(ClientDatabase, 'refresh'), 'hivemind-core must expose ClientDatabase.refresh for policy admission'; \
+assert Client(client_id=1, api_key='k').message_blacklist == [], 'hivemind-plugin-manager must still answer the removed Client.message_blacklist with []'; \
 send_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_send); \
 internal_source = inspect.getsource(agent_plugin.OVOSAgentProtocol.handle_internal_mycroft); \
 assert ('list(self.clients.items())' in send_source or 'list(self.clients.values())' in send_source), 'agent send fan-out must snapshot clients'; \
