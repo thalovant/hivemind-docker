@@ -39,7 +39,9 @@ PACKAGE = "ovos_bus_client.session"
 ANCHOR_LINE = '        context = IntentContextManager.deserialize(data.get("context", {}))'
 
 GUARDED = '''        try:
-            context = IntentContextManager.deserialize(data.get("context", {}))
+            raw_context = data.get("context", {})
+            _validate_legacy_context_shape(raw_context)
+            context = IntentContextManager.deserialize(raw_context)
         except (AttributeError, TypeError, ValueError) as error:
             # The carrier's own contract: a malformed session is rejected as
             # MalformedSession, which SessionManager already catches. Letting
@@ -48,6 +50,54 @@ GUARDED = '''        try:
                 f"session carries a malformed intent context: {error}"
             ) from error
 '''
+
+# Lifted verbatim from the upstream change so the two cannot drift. The parser
+# alone is not enough: it accepts a frame whose entities is a string, and the
+# shape is not exercised until Session.__init__ folds the stack, which is
+# outside the guard -- so a payload the guard accepted still put an
+# AttributeError on the reader thread.
+HELPER = '''def _validate_legacy_context_shape(raw) -> None:
+    """Reject a legacy ``context`` the session fold cannot consume.
+
+    ``IntentContextManager.deserialize`` is lenient: it will happily build a
+    frame whose ``entities`` is a string, because it only unpacks pairs and
+    passes the frame dict through. The shape is not actually exercised until
+    ``Session.__init__`` folds the stack into ``intent_context``, and that fold
+    is outside every handler written for ``deserialize`` -- so a peer could put
+    an ``AttributeError`` on the reader's thread with a payload this function
+    had already accepted.
+
+    The accepted shape is exactly what ``IntentContextManager.serialize``
+    emits: ``frame_stack`` a list of ``(frame, timestamp)`` pairs, each frame a
+    mapping, its ``entities`` a list of mappings (``_entity_to_entry`` calls
+    ``.get`` on each). Tuples are accepted alongside lists because an in-process
+    round trip never passes through JSON.
+    """
+    if not isinstance(raw, dict):
+        raise TypeError(f"context must be a mapping, got {type(raw).__name__}")
+    frames = raw.get("frame_stack", [])
+    if not isinstance(frames, (list, tuple)):
+        raise TypeError(
+            f"frame_stack must be a list, got {type(frames).__name__}")
+    for frame in frames:
+        if not (isinstance(frame, (list, tuple)) and len(frame) == 2):
+            raise ValueError(
+                "each frame_stack item must be a (frame, timestamp) pair")
+        payload = frame[0]
+        if not isinstance(payload, dict):
+            raise TypeError(
+                f"frame must be a mapping, got {type(payload).__name__}")
+        entities = payload.get("entities", [])
+        if not isinstance(entities, (list, tuple)):
+            raise TypeError(
+                f"frame entities must be a list, got {type(entities).__name__}")
+        for entity in entities:
+            if not isinstance(entity, dict):
+                raise TypeError(
+                    f"each entity must be a mapping, got {type(entity).__name__}")
+'''
+
+CLASS_ANCHOR_LINE = "class Session(_SpecSession):"
 
 
 def main() -> None:
@@ -62,15 +112,24 @@ def main() -> None:
         return
 
     lines = source.splitlines(keepends=True)
-    hits = [i for i, line in enumerate(lines) if line.rstrip("\n") == ANCHOR_LINE]
-    if len(hits) != 1:
-        raise SystemExit(
-            f"expected exactly one intent-context deserialize anchor in {path}, "
-            f"found {len(hits)}. Upstream moved it: check whether the guard is "
-            "now applied upstream and drop this patch, or re-anchor it."
-        )
 
-    lines[hits[0]] = GUARDED
+    def sole(anchor: str, what: str) -> int:
+        found = [i for i, line in enumerate(lines) if line.rstrip("\n") == anchor]
+        if len(found) != 1:
+            raise SystemExit(
+                f"expected exactly one {what} anchor in {path}, found "
+                f"{len(found)}. Upstream moved it: check whether the guard is "
+                "now applied upstream and drop this patch, or re-anchor it."
+            )
+        return found[0]
+
+    call = sole(ANCHOR_LINE, "intent-context deserialize")
+    cls = sole(CLASS_ANCHOR_LINE, "Session class")
+
+    # Insert from the BOTTOM up so the first edit cannot shift the second
+    # index. The helper goes above the class that uses it.
+    lines[call] = GUARDED
+    lines[cls] = HELPER + "\n\n" + lines[cls]
     path.write_text("".join(lines))
 
 
@@ -91,6 +150,11 @@ def verify() -> None:
             {"context": {"frame_stack": "not-a-list"}},
             {"context": {"frame_stack": [["x", 1]]}},
             {"context": {"frame_stack": [{"entities": "nope"}]}},
+            # these three only detonate when Session.__init__ folds the stack,
+            # which is why guarding the parse alone was not enough
+            {"context": {"frame_stack": [[{"entities": "nope"}, 1]]}},
+            {"context": {"frame_stack": ""}},
+            {"context": {"frame_stack": {}}},
         ):
             try:
                 Session.deserialize(payload)
@@ -103,9 +167,21 @@ def verify() -> None:
                 )
             raise SystemExit(f"a malformed intent context did not raise: {payload!r}")
 
-        # A well-formed carrier must be untouched by the guard.
+        # A well-formed carrier must be untouched by the guard, including
+        # whatever the library's own serializer emits -- the shape check is
+        # written against that output, so this is the regression that matters.
+        import json
+        from ovos_bus_client.session import IntentContextManager
+
         assert Session.deserialize({"session_id": "ok", "context": {}}).session_id == "ok"
         assert Session.deserialize({"session_id": "bare"}).session_id == "bare"
+        manager = IntentContextManager()
+        manager.inject_context({"data": [["value", "key"]], "key": "key",
+                                "confidence": 1.0})
+        round_trip = {"session_id": "rt", "context": manager.serialize()}
+        assert Session.deserialize(round_trip).session_id == "rt"
+        assert Session.deserialize(
+            json.loads(json.dumps(round_trip))).session_id == "rt"
         """
     )
     result = subprocess.run([sys.executable, "-c", check], capture_output=True, text=True)
