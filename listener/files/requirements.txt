@@ -1,8 +1,8 @@
-poorman-handshake @ git+https://github.com/JarbasHiveMind/poorman_handshake.git@a9bd5a9ac3ec48619c2c20adef71fc44bdda2a73
-hivemind-bus-client @ git+https://github.com/JarbasHiveMind/hivemind-websocket-client.git@15efebb4b09dc50f6abc329e38030bf163ced941
-hivemind-plugin-manager @ git+https://github.com/JarbasHiveMind/hivemind-plugin-manager.git@19fb9f23d1b61c9ebb2044e7b45316df9cc008de
-hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@07ffb5f0f08be4aae702ce2a98c2d46064fbf3aa
-hivemind-core @ git+https://github.com/thalovant/HiveMind-core.git@0883b5c147d0db92d9ff9f072ff87477ed1bf8f6
+poorman-handshake @ git+https://github.com/JarbasHiveMind/poorman_handshake.git@384dff913019ebc9f526c3f0299e9d582b5db3ef
+hivemind-bus-client @ git+https://github.com/JarbasHiveMind/hivemind-websocket-client.git@0c1d426f48fbe3ae9ca36ef7c1bbf171fa16aa36
+hivemind-plugin-manager @ git+https://github.com/JarbasHiveMind/hivemind-plugin-manager.git@f264348642ca869931fe4af55fc493d5df115dc1
+hivemind-websocket-protocol @ git+https://github.com/thalovant/hivemind-websocket-protocol.git@b4ebaf8dbd4e4ac365e8645e5052a9f0dfa26a1b
+hivemind-core @ git+https://github.com/thalovant/HiveMind-core.git@ad3c10d2dd13c6d574dff5e803cac42ab5d9d935
 hivemind-http-protocol==0.0.11a1
 # Pinned to the fork rather than the local wheel: files/ still carried
 # 0.1.1a3, which predates the health_file readiness marker. Rebuilding from
@@ -20,4 +20,4 @@ packaging
 # Per-satellite conversation journal: a policy plugin, so it observes every
 # admitted message after forwarding rather than sitting in the reply path.
 # Inert without a redis_url/storage, so installing it is safe for every hub.
-hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@e9e91c7e6a3920e67866ee5b2c57926a3c5d1a85
+hivemind-redis-memory @ git+https://github.com/thalovant/hivemind-redis-memory.git@66647e908a9cc9f28efa4d9576f4f64b7b7f6361
