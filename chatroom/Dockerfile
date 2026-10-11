@@ -35,10 +35,12 @@ USER root
 
 SHELL ["/bin/bash", "-c"]
 
+# bitstring<5: 5.0.0 (2026-10-11) removed BitStream, which hivemind-bus-client
+# imports at module load while requiring only bitstring>=4.1.1.
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     PRERELEASE="${UV_PRERELEASE}" \
  && if [ "${ALPHA}" = "true" ]; then PRERELEASE="allow"; fi \
- && uv pip install --prerelease="${PRERELEASE}" hivemind-flask-chatroom \
+ && uv pip install --prerelease="${PRERELEASE}" hivemind-flask-chatroom "bitstring>=4.1.1,<5" \
  && rm -rf /tmp/* /var/tmp/*
 
 USER "$USER"

@@ -1,3 +1,7 @@
 git+https://github.com/JarbasHiveMind/HiveMind-cli.git
 hivemind-core
 lxml>=5.1.0
+# bitstring 5.0.0 (2026-10-11) removed BitStream, which hivemind-bus-client
+# imports at module load while requiring only bitstring>=4.1.1. Lift once a
+# hivemind-bus-client release supports bitstring 5.
+bitstring>=4.1.1,<5
