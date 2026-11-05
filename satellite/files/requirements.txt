@@ -10,7 +10,6 @@ ovos-PHAL-plugin-ipgeo
 ovos-stt-plugin-chromium
 ovos-tts-plugin-polly
 ovos-vad-plugin-webrtcvad
-ovos-ww-plugin-openwakeword
 ovos-ww-plugin-precise-lite
 # bitstring 5.0.0 (2026-10-11) removed BitStream, which hivemind-bus-client
 # imports at module load while requiring only bitstring>=4.1.1. Lift once a
